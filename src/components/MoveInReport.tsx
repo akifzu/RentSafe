@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { ArrowLeft, Plus, Trash2, Camera } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Camera, Upload, Sparkles, AlertCircle, CheckCircle } from 'lucide-react';
 import type { Property, MoveInReportType } from '../App';
+import { analyzePropertyPhoto, isClaudeConfigured } from '../services/claudeAI';
 
 type MoveInReportProps = {
   propertyId: string;
@@ -14,25 +15,81 @@ type Room = {
   condition: string;
   photos: string[];
   notes: string;
+  aiAnalysis?: any;
+};
+
+type UploadingState = {
+  roomIndex: number;
+  isAnalyzing: boolean;
 };
 
 export function MoveInReport({ propertyId, property, onSubmit, onBack }: MoveInReportProps) {
   const [rooms, setRooms] = useState<Room[]>([
-    { name: 'Living Room', condition: 'excellent', photos: [], notes: '' },
+    { name: 'Living Room', condition: 'excellent', photos: [], notes: '', aiAnalysis: null },
   ]);
+  const [uploadingState, setUploadingState] = useState<UploadingState | null>(null);
+  const [aiEnabled] = useState(isClaudeConfigured());
 
   const addRoom = () => {
-    setRooms([...rooms, { name: '', condition: 'good', photos: [], notes: '' }]);
+    setRooms([...rooms, { name: '', condition: 'good', photos: [], notes: '', aiAnalysis: null }]);
   };
 
   const removeRoom = (index: number) => {
     setRooms(rooms.filter((_, i) => i !== index));
   };
 
-  const updateRoom = (index: number, field: keyof Room, value: string) => {
+  const updateRoom = (index: number, field: keyof Room, value: any) => {
     const newRooms = [...rooms];
     newRooms[index] = { ...newRooms[index], [field]: value };
     setRooms(newRooms);
+  };
+
+  const handlePhotoUpload = async (index: number, event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    const file = files[0];
+    const reader = new FileReader();
+
+    reader.onload = async (e) => {
+      const base64Image = e.target?.result as string;
+      const base64Data = base64Image.split(',')[1]; // Remove data:image/jpeg;base64, prefix
+
+      // Add photo to room
+      const newPhotos = [...rooms[index].photos, base64Image];
+      updateRoom(index, 'photos', newPhotos);
+
+      // Run AI analysis if enabled
+      if (aiEnabled) {
+        setUploadingState({ roomIndex: index, isAnalyzing: true });
+        
+        try {
+          const analysis = await analyzePropertyPhoto(base64Data, {
+            propertyAddress: property?.propertyAddress || 'Unknown Property',
+            roomType: rooms[index].name || 'Unnamed Room',
+            moveInDate: property?.moveInDate || new Date().toISOString(),
+            purpose: 'Tenant documenting pre-existing damage to protect deposit',
+          });
+
+          updateRoom(index, 'aiAnalysis', analysis);
+          
+          // Auto-populate notes if AI found issues
+          if (analysis.items_detected && analysis.items_detected.length > 0) {
+            const aiNotes = analysis.items_detected
+              .map((item: any) => `${item.object}: ${item.issue} - ${item.reasoning}`)
+              .join('\n');
+            updateRoom(index, 'notes', aiNotes);
+          }
+        } catch (error) {
+          console.error('AI analysis failed:', error);
+          alert('AI analysis failed. Photo uploaded but analysis unavailable.');
+        } finally {
+          setUploadingState(null);
+        }
+      }
+    };
+
+    reader.readAsDataURL(file);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -141,17 +198,134 @@ export function MoveInReport({ propertyId, property, onSubmit, onBack }: MoveInR
 
                     <div>
                       <label className="block text-gray-700 mb-2">
-                        Photos
+                        Photos {aiEnabled && <span className="text-xs text-purple-600 font-medium">(AI Analysis Enabled ✨)</span>}
                       </label>
-                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-                        <Camera className="w-8 h-8 text-gray-500 mx-auto mb-2" />
-                        <p className="text-sm text-gray-600">
-                          In a production app, you would upload photos here
-                        </p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          Click to add photos of this room
-                        </p>
+                      
+                      {/* Photo Upload */}
+                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-indigo-400 transition-colors cursor-pointer relative">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => handlePhotoUpload(index, e)}
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                          disabled={uploadingState?.roomIndex === index}
+                        />
+                        
+                        {uploadingState?.roomIndex === index && uploadingState.isAnalyzing ? (
+                          <>
+                            <Sparkles className="w-8 h-8 text-purple-500 mx-auto mb-2 animate-pulse" />
+                            <p className="text-sm text-purple-600 font-medium">
+                              AI Analyzing Photo...
+                            </p>
+                            <p className="text-xs text-gray-500 mt-1">
+                              Detecting damage and classifying liability
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="w-8 h-8 text-gray-500 mx-auto mb-2" />
+                            <p className="text-sm text-gray-600">
+                              Click to upload room photos
+                            </p>
+                            <p className="text-xs text-gray-500 mt-1">
+                              {aiEnabled ? 'AI will analyze for damage automatically' : 'JPG, PNG up to 10MB'}
+                            </p>
+                          </>
+                        )}
                       </div>
+
+                      {/* Uploaded Photos Preview */}
+                      {room.photos.length > 0 && (
+                        <div className="mt-4 grid grid-cols-2 gap-2">
+                          {room.photos.map((photo, photoIndex) => (
+                            <div key={photoIndex} className="relative">
+                              <img
+                                src={photo}
+                                alt={`Room ${index + 1} - Photo ${photoIndex + 1}`}
+                                className="w-full h-32 object-cover rounded-lg border border-gray-200"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const newPhotos = room.photos.filter((_, i) => i !== photoIndex);
+                                  updateRoom(index, 'photos', newPhotos);
+                                }}
+                                className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full hover:bg-red-600"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* AI Analysis Results */}
+                      {room.aiAnalysis && room.aiAnalysis.items_detected && (
+                        <div className="mt-4 p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                          <div className="flex items-center gap-2 mb-3">
+                            <Sparkles className="w-5 h-5 text-purple-600" />
+                            <h4 className="font-medium text-purple-900">AI Analysis Results</h4>
+                          </div>
+                          
+                          {room.aiAnalysis.items_detected.length === 0 ? (
+                            <div className="flex items-center gap-2 text-green-700">
+                              <CheckCircle className="w-4 h-4" />
+                              <p className="text-sm">No damage detected - Room appears to be in good condition</p>
+                            </div>
+                          ) : (
+                            <div className="space-y-3">
+                              {room.aiAnalysis.items_detected.map((item: any, itemIndex: number) => (
+                                <div key={itemIndex} className="bg-white p-3 rounded border border-purple-200">
+                                  <div className="flex items-start justify-between mb-2">
+                                    <div className="flex-1">
+                                      <p className="font-medium text-gray-900 capitalize">
+                                        {item.object}: {item.issue}
+                                      </p>
+                                      <p className="text-xs text-gray-500">{item.location}</p>
+                                    </div>
+                                    <span className={`px-2 py-1 text-xs rounded-full ${
+                                      item.classification === 'wear_and_tear' ? 'bg-green-100 text-green-700' :
+                                      item.classification === 'pre_existing_damage' ? 'bg-yellow-100 text-yellow-700' :
+                                      item.classification === 'tenant_damage' ? 'bg-red-100 text-red-700' :
+                                      'bg-gray-100 text-gray-700'
+                                    }`}>
+                                      {item.classification.replace('_', ' ')}
+                                    </span>
+                                  </div>
+                                  
+                                  <p className="text-sm text-gray-700 mb-2">{item.reasoning}</p>
+                                  
+                                  <div className="flex items-center justify-between text-xs text-gray-600">
+                                    <span>Severity: <strong>{item.severity}</strong></span>
+                                    <span>Liability: <strong>{item.tenant_liability}</strong></span>
+                                    <span>Confidence: <strong>{Math.round(item.confidence * 100)}%</strong></span>
+                                  </div>
+                                </div>
+                              ))}
+                              
+                              {room.aiAnalysis.overall_assessment && (
+                                <div className="mt-3 p-3 bg-indigo-50 rounded border border-indigo-200">
+                                  <p className="text-sm text-indigo-900">
+                                    <strong>Overall Assessment:</strong> {room.aiAnalysis.overall_assessment}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {!aiEnabled && room.photos.length > 0 && (
+                        <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start gap-2">
+                          <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-sm text-yellow-800 font-medium">AI Analysis Unavailable</p>
+                            <p className="text-xs text-yellow-700 mt-1">
+                              Configure VITE_CLAUDE_API_KEY to enable automatic damage detection
+                            </p>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

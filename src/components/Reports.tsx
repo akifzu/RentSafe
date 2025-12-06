@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { ArrowLeft, FileText, Download, Calendar, TrendingUp, DollarSign } from 'lucide-react';
+import { ArrowLeft, FileText, Download, Calendar, TrendingUp, DollarSign, Sparkles, AlertCircle, FileSignature, Gavel } from 'lucide-react';
 import type { Property, MoveInReportType, UtilityReading } from '../App';
+import { generateLegalDocument, isClaudeConfigured } from '../services/claudeAI';
 
 type ReportsProps = {
   properties: Property[];
@@ -20,6 +21,10 @@ export function Reports({ properties, reports, utilities, onBack, defaultMode = 
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
+  const [showDisputeDialog, setShowDisputeDialog] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generatedDocument, setGeneratedDocument] = useState<string>('');
+  const [aiEnabled] = useState(isClaudeConfigured());
 
   const selectedProperty = properties.find(p => p.id === selectedPropertyId);
   const selectedReport = reports.find(r => r.propertyId === selectedPropertyId);
@@ -84,6 +89,98 @@ export function Reports({ properties, reports, utilities, onBack, defaultMode = 
       : 'Complete Report';
     
     alert(`${reportTypeName} for ${selectedProperty?.propertyAddress} would be generated here. In production, this would create a downloadable PDF.`);
+  };
+
+  const handleGenerateDisputeReport = async () => {
+    if (!selectedPropertyId || !aiEnabled) return;
+
+    // In a real app, this would open a dialog to collect dispute details
+    const confirmed = confirm('Generate a dispute report? This will analyze the evidence and provide recommendations for resolution.');
+    if (!confirmed) return;
+
+    setIsGenerating(true);
+    setShowDisputeDialog(true);
+
+    try {
+      const document = await generateLegalDocument('generate_dispute_report', {
+        tenantName: selectedProperty?.renterName || 'Tenant Name',
+        landlordName: selectedProperty?.ownerEmail || 'Landlord',
+        propertyAddress: selectedProperty?.propertyAddress || '',
+        moveInDate: selectedProperty?.moveInDate || '',
+        moveOutDate: new Date().toISOString().split('T')[0],
+        amount: 1500,
+        tenantClaim: 'The damage was pre-existing and documented in move-in photos',
+        landlordClaim: 'The damage is new and tenant is responsible',
+        moveInEvidence: selectedReport ? 'Move-in report with photos available' : 'No move-in report',
+        moveOutEvidence: 'Photos taken at move-out',
+      });
+
+      setGeneratedDocument(document);
+    } catch (error) {
+      console.error('Failed to generate dispute report:', error);
+      alert('Failed to generate dispute report. Please check your API configuration.');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleGenerateForm198 = async () => {
+    if (!selectedPropertyId || !aiEnabled) return;
+
+    const confirmed = confirm('Generate Form 198 (Borang 198)? This is for filing with the Tribunal Tuntutan Pengguna Malaysia.');
+    if (!confirmed) return;
+
+    setIsGenerating(true);
+    setShowDisputeDialog(true);
+
+    try {
+      const document = await generateLegalDocument('generate_form_198', {
+        tenantName: selectedProperty?.renterName || 'Tenant Name',
+        landlordName: selectedProperty?.ownerEmail || 'Landlord',
+        propertyAddress: selectedProperty?.propertyAddress || '',
+        moveInDate: selectedProperty?.moveInDate || '',
+        moveOutDate: new Date().toISOString().split('T')[0],
+        amount: 1500,
+        tenantClaim: 'Security deposit wrongfully withheld',
+        landlordClaim: 'Deposit kept for damages',
+      });
+
+      setGeneratedDocument(document);
+    } catch (error) {
+      console.error('Failed to generate Form 198:', error);
+      alert('Failed to generate Form 198. Please check your API configuration.');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleGenerateDemandLetter = async () => {
+    if (!selectedPropertyId || !aiEnabled) return;
+
+    const confirmed = confirm('Generate a demand letter? This is sent before escalating to legal action.');
+    if (!confirmed) return;
+
+    setIsGenerating(true);
+    setShowDisputeDialog(true);
+
+    try {
+      const document = await generateLegalDocument('generate_demand_letter', {
+        tenantName: selectedProperty?.renterName || 'Tenant Name',
+        landlordName: selectedProperty?.ownerEmail || 'Landlord',
+        propertyAddress: selectedProperty?.propertyAddress || '',
+        moveInDate: selectedProperty?.moveInDate || '',
+        amount: 1500,
+        tenantClaim: 'Requesting return of security deposit',
+        landlordClaim: 'Deposit kept for alleged damages',
+      });
+
+      setGeneratedDocument(document);
+    } catch (error) {
+      console.error('Failed to generate demand letter:', error);
+      alert('Failed to generate demand letter. Please check your API configuration.');
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const totals = calculateUtilityTotals();
@@ -251,6 +348,58 @@ export function Reports({ properties, reports, utilities, onBack, defaultMode = 
                   <Download className="w-5 h-5" />
                   {mode === 'monthly' ? 'Generate Monthly Report' : 'Generate Report'}
                 </button>
+
+                {/* AI-Powered Legal Documents */}
+                {mode === 'general' && (
+                  <div className="mt-6 pt-6 border-t border-gray-200">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Sparkles className="w-5 h-5 text-purple-600" />
+                      <h3 className="font-medium text-gray-900">AI Legal Documents</h3>
+                    </div>
+
+                    {!aiEnabled && (
+                      <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start gap-2">
+                        <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                        <p className="text-sm text-yellow-800">
+                          Configure VITE_CLAUDE_API_KEY to enable AI document generation
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="space-y-2">
+                      <button
+                        onClick={handleGenerateDisputeReport}
+                        disabled={!selectedPropertyId || !aiEnabled || isGenerating}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed text-sm"
+                      >
+                        <FileText className="w-4 h-4" />
+                        Generate Dispute Report
+                      </button>
+
+                      <button
+                        onClick={handleGenerateDemandLetter}
+                        disabled={!selectedPropertyId || !aiEnabled || isGenerating}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed text-sm"
+                      >
+                        <FileSignature className="w-4 h-4" />
+                        Generate Demand Letter
+                      </button>
+
+                      <button
+                        onClick={handleGenerateForm198}
+                        disabled={!selectedPropertyId || !aiEnabled || isGenerating}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed text-sm"
+                      >
+                        <Gavel className="w-4 h-4" />
+                        Generate Form 198 (Legal)
+                      </button>
+                    </div>
+
+                    <p className="text-xs text-gray-500 mt-3">
+                      These documents are AI-generated based on Malaysian tenancy law. Review carefully and consult a lawyer for complex disputes.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -471,6 +620,86 @@ export function Reports({ properties, reports, utilities, onBack, defaultMode = 
             </div>
           </div>
         </div>
+
+        {/* Generated Document Modal */}
+        {showDisputeDialog && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+              <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Sparkles className="w-6 h-6 text-purple-600" />
+                  <h2 className="text-xl font-bold text-gray-900">AI-Generated Legal Document</h2>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowDisputeDialog(false);
+                    setGeneratedDocument('');
+                  }}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <span className="text-2xl">&times;</span>
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-6">
+                {isGenerating ? (
+                  <div className="flex flex-col items-center justify-center py-12">
+                    <Sparkles className="w-12 h-12 text-purple-600 animate-pulse mb-4" />
+                    <p className="text-lg text-gray-700 font-medium">Generating Legal Document...</p>
+                    <p className="text-sm text-gray-500 mt-2">Analyzing evidence and applying Malaysian law</p>
+                  </div>
+                ) : (
+                  <div className="prose max-w-none">
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+                      <div className="flex items-start gap-2">
+                        <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-sm text-yellow-800 font-medium">Legal Disclaimer</p>
+                          <p className="text-xs text-yellow-700 mt-1">
+                            This is an AI-generated document for informational purposes only. 
+                            It is not legal advice. Consult a qualified lawyer for complex disputes or amounts exceeding RM 10,000.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <pre className="whitespace-pre-wrap text-sm bg-gray-50 p-6 rounded-lg border border-gray-200 font-mono">
+                      {generatedDocument}
+                    </pre>
+                  </div>
+                )}
+              </div>
+
+              {!isGenerating && (
+                <div className="p-6 border-t border-gray-200 flex gap-3">
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(generatedDocument);
+                      alert('Document copied to clipboard!');
+                    }}
+                    className="flex-1 px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                  >
+                    Copy to Clipboard
+                  </button>
+                  <button
+                    onClick={() => {
+                      const blob = new Blob([generatedDocument], { type: 'text/plain' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `legal-document-${Date.now()}.txt`;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    }}
+                    className="flex-1 px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                  >
+                    Download as TXT
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );

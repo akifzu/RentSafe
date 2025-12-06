@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AI Test</title>
+</head>
+<body>
+    <h1>SewaSecure AI Test</h1>
+    <button onclick="testBackend()">Test Backend Health</button>
+    <button onclick="testAI()">Test AI Call</button>
+    <pre id="output"></pre>
+
+    <script>
+        const output = document.getElementById('output');
+
+        async function testBackend() {
+            output.textContent = 'Testing backend health...\n';
+            try {
+                const response = await fetch('http://localhost:3001/api/health');
+                const data = await response.json();
+                output.textContent += JSON.stringify(data, null, 2);
+            } catch (error) {
+                output.textContent += 'ERROR: ' + error.message;
+            }
+        }
+
+        async function testAI() {
+            output.textContent = 'Testing AI call through proxy...\n';
+            try {
+                const response = await fetch('http://localhost:3001/api/claude', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        model: 'claude-sonnet-4-20250514',
+                        max_tokens: 50,
+                        messages: [{
+                            role: 'user',
+                            content: 'Say hello in one word'
+                        }]
+                    })
+                });
+
+                const data = await response.json();
+                output.textContent += JSON.stringify(data, null, 2);
+            } catch (error) {
+                output.textContent += 'ERROR: ' + error.message;
+            }
+        }
+    </script>
+</body>
+</html>
+

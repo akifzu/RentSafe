@@ -10,6 +10,7 @@ import { MoveInReport } from './components/MoveInReport';
 import { UtilitiesTracker } from './components/UtilitiesTracker';
 import { Reports } from './components/Reports';
 import { AskAI } from './components/AskAI';
+import { DiagnosticCheck } from './components/DiagnosticCheck';
 
 export type Property = {
   id: string;
@@ -113,6 +114,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Navigation currentView={currentView} onNavigate={handleNavigate} />
+      <DiagnosticCheck />
       
       {currentView === 'dashboard' && (
         <Dashboard 

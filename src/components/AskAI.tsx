@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { ArrowLeft, MessageSquare, Send, Bot, User } from 'lucide-react';
+import { ArrowLeft, MessageSquare, Send, Bot, User, AlertCircle } from 'lucide-react';
+import { chatWithAI, isClaudeConfigured, type ClaudeMessage } from '../services/claudeAI';
 
 type Message = {
   id: string;
@@ -17,57 +18,18 @@ export function AskAI({ onBack }: AskAIProps) {
     {
       id: '1',
       role: 'assistant',
-      content: 'Hello! I\'m your SewaSecure AI assistant. I can help you with questions about the rental process, utilities tracking, lease agreements, and more. How can I help you today?',
+      content: 'Hello! I\'m your SewaSecure AI assistant. I can help you with dispute resolution, damage assessment, legal document generation, and Malaysian tenancy law questions. How can I help you today?',
       timestamp: new Date().toISOString(),
     },
   ]);
   const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [aiEnabled] = useState(isClaudeConfigured());
 
-  // Mock AI responses
-  const getAIResponse = (userQuestion: string): string => {
-    const lowerQuestion = userQuestion.toLowerCase();
-
-    if (lowerQuestion.includes('utility') || lowerQuestion.includes('utilities') || lowerQuestion.includes('water') || lowerQuestion.includes('electricity')) {
-      return 'Utilities tracking helps you monitor your water, electricity, and rent payments. You can add readings regularly through the Utilities Tracker feature. This creates a transparent record of all utility usage and costs, which is helpful for budgeting and resolving any disputes.';
-    }
-
-    if (lowerQuestion.includes('report') || lowerQuestion.includes('move-in')) {
-      return 'The move-in report is crucial for documenting the property condition when you first move in. Take detailed notes and photos of each room. This report protects both you and the landlord by providing a baseline for comparison during move-out, ensuring you\'re not charged for pre-existing damage.';
-    }
-
-    if (lowerQuestion.includes('agreement') || lowerQuestion.includes('lease') || lowerQuestion.includes('contract')) {
-      return 'The rental agreement is a legally binding document that outlines the terms of your tenancy. Make sure to read it carefully before signing. Key points to review include rent amount, payment due dates, lease duration, maintenance responsibilities, and termination conditions.';
-    }
-
-    if (lowerQuestion.includes('ticket') || lowerQuestion.includes('start') || lowerQuestion.includes('begin')) {
-      return 'To start the rental process, create a new ticket with the property details, your information, and upload your Letter of Offer (LOO) document. This initiates the secure rental workflow: 1) Create ticket with LOO, 2) Complete move-in report, 3) Sign agreement, and 4) Track utilities. Each step ensures transparency and documentation.';
-    }
-
-    if (lowerQuestion.includes('loo') || lowerQuestion.includes('letter of offer')) {
-      return 'The Letter of Offer (LOO) is a required document when creating a rental ticket. It\'s an official document from the property owner offering you the tenancy. Make sure it includes the property address, rental terms, and both parties\' signatures. You\'ll need to upload this document (PDF, DOC, or image format) when creating your ticket.';
-    }
-
-    if (lowerQuestion.includes('security deposit') || lowerQuestion.includes('deposit')) {
-      return 'Security deposits protect landlords against damage or unpaid rent. The move-in report you create is critical for getting your full deposit back. Document everything carefully at move-in, maintain the property well, and complete a move-out inspection to ensure a smooth return of your deposit.';
-    }
-
-    if (lowerQuestion.includes('maintenance') || lowerQuestion.includes('repair')) {
-      return 'For maintenance issues, document the problem with photos and detailed notes. Contact your landlord promptly through official channels. Keep records of all communications. Emergency repairs (like water leaks or heating failures) should be reported immediately.';
-    }
-
-    if (lowerQuestion.includes('tenant rights') || lowerQuestion.includes('rights')) {
-      return 'Tenant rights vary by location, but generally include the right to a habitable property, privacy, non-discrimination, and return of security deposit (minus legitimate deductions). Always document everything and know your local tenant laws. Consider consulting a local tenant advocacy group for specific advice.';
-    }
-
-    // Default response
-    return 'That\'s a great question! For specific legal or financial advice, I recommend consulting with a professional. I can help you with general information about using the SewaSecure platform, understanding the rental process, utilities tracking, and documentation best practices. What would you like to know more about?';
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim()) return;
+    if (!input.trim() || isLoading) return;
 
-    // Add user message
     const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
@@ -75,21 +37,55 @@ export function AskAI({ onBack }: AskAIProps) {
       timestamp: new Date().toISOString(),
     };
 
-    setMessages([...messages, userMessage]);
+    const updatedMessages = [...messages, userMessage];
+    setMessages(updatedMessages);
+    setInput('');
 
-    // Simulate AI thinking delay
-    setTimeout(() => {
+    if (!aiEnabled) {
+      // Fallback response if AI not configured
+      setTimeout(() => {
+        const fallbackMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: 'AI is not configured. Please set up your Claude API key (VITE_CLAUDE_API_KEY) to use the AI assistant. In the meantime, you can still use all other features of SewaSecure.',
+          timestamp: new Date().toISOString(),
+        };
+        setMessages((prev) => [...prev, fallbackMessage]);
+      }, 500);
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      // Convert to Claude message format
+      const claudeHistory: ClaudeMessage[] = messages.map(msg => ({
+        role: msg.role,
+        content: msg.content,
+      }));
+
+      const aiResponse = await chatWithAI(claudeHistory, input);
+
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: getAIResponse(input),
+        content: aiResponse,
         timestamp: new Date().toISOString(),
       };
 
       setMessages((prev) => [...prev, aiMessage]);
-    }, 800);
-
-    setInput('');
+    } catch (error) {
+      console.error('AI chat error:', error);
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: 'I apologize, but I encountered an error processing your question. Please try again or contact support if the issue persists.',
+        timestamp: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -118,6 +114,19 @@ export function AskAI({ onBack }: AskAIProps) {
 
       {/* Chat Container */}
       <main className="flex-1 overflow-hidden flex flex-col max-w-4xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
+        {/* AI Status Warning */}
+        {!aiEnabled && (
+          <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm text-yellow-800 font-medium">AI Assistant Not Configured</p>
+              <p className="text-xs text-yellow-700 mt-1">
+                Set VITE_CLAUDE_API_KEY environment variable to enable full AI capabilities
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Messages */}
         <div className="flex-1 overflow-y-auto mb-4 space-y-4">
           {messages.map((message) => (
@@ -163,10 +172,10 @@ export function AskAI({ onBack }: AskAIProps) {
             <p className="text-sm text-gray-600 mb-3">Suggested questions:</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {[
-                'How do I track utilities?',
-                'What should I include in a move-in report?',
-                'How does the rental agreement work?',
-                'What are my tenant rights?',
+                'My landlord withheld RM 500 from my deposit',
+                'How do I generate a dispute report?',
+                'What is Form 198 and when do I need it?',
+                'Can I be charged for normal wear and tear?',
               ].map((question) => (
                 <button
                   key={question}
@@ -192,11 +201,20 @@ export function AskAI({ onBack }: AskAIProps) {
             />
             <button
               type="submit"
-              disabled={!input.trim()}
+              disabled={!input.trim() || isLoading}
               className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2"
             >
-              <Send className="w-5 h-5" />
-              Send
+              {isLoading ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Thinking...
+                </>
+              ) : (
+                <>
+                  <Send className="w-5 h-5" />
+                  Send
+                </>
+              )}
             </button>
           </div>
         </form>
