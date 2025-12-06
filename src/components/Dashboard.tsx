@@ -1,4 +1,5 @@
-import { FileText, Zap, MessageSquare, PlusCircle, ChevronRight, LogOut, TrendingUp, CheckCircle2, Clock, ArrowRight } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { FileText, Zap, MessageSquare, PlusCircle, ChevronRight, LogOut, TrendingUp, CheckCircle2, Clock, ArrowRight, Send, Paperclip, X, Bot } from 'lucide-react';
 import type { Property } from '../App';
 import type { AuthUser } from './SignIn';
 
@@ -15,6 +16,39 @@ export function Dashboard({ properties, user, onNavigate, onSignOut }: Dashboard
   const activeProperties = properties.filter(p => p.status === 'active').length;
   const pendingProperties = properties.filter(p => p.status === 'pending').length;
   const totalProperties = properties.length;
+
+  // Ask AI state
+  const [aiInput, setAiInput] = useState('');
+  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
+  const [aiResponse, setAiResponse] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileAttach = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    setAttachedFiles([...attachedFiles, ...files]);
+  };
+
+  const removeFile = (index: number) => {
+    setAttachedFiles(attachedFiles.filter((_, i) => i !== index));
+  };
+
+  const handleAISubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!aiInput.trim() && attachedFiles.length === 0) return;
+
+    setIsLoading(true);
+    setAiResponse(null);
+
+    // Simulate AI response
+    setTimeout(() => {
+      const response = `I've received your ${attachedFiles.length > 0 ? `message with ${attachedFiles.length} file(s) attached` : 'message'}. ${aiInput.trim() ? `Regarding "${aiInput}", ` : ''}I can help you with questions about rental processes, utilities tracking, lease agreements, and property management. How can I assist you further?`;
+      setAiResponse(response);
+      setIsLoading(false);
+      setAiInput('');
+      setAttachedFiles([]);
+    }, 1500);
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 pb-20 md:pb-8">
@@ -43,7 +77,7 @@ export function Dashboard({ properties, user, onNavigate, onSignOut }: Dashboard
           <div className="absolute inset-0 bg-grid-white/10 bg-[size:20px_20px] opacity-20"></div>
           <div className="relative px-6 sm:px-8 lg:px-12 py-12 md:py-16">
             <div className="max-w-2xl">
-              <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-4 leading-tight">
+              <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-black mb-4 leading-tight">
                 Welcome back, {user.name.split(' ')[0]}! 👋
               </h1>
               <p className="text-lg md:text-xl text-indigo-100 mb-8 leading-relaxed">
@@ -59,6 +93,139 @@ export function Dashboard({ properties, user, onNavigate, onSignOut }: Dashboard
                   <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+
+        {/* Ask AI Prompt Box - Below Hero Section */}
+        <div className="mb-8 md:mb-12">
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-purple-500 to-purple-600 px-6 py-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-lg flex items-center justify-center flex-shrink-0">
+                  <Bot className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-white">AI Assistant</h3>
+                  <p className="text-sm text-purple-100">Get instant help with your rental questions</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6">
+              {/* AI Response Display */}
+              {aiResponse && (
+                <div className="mb-6 p-4 bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-xl">
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <Bot className="w-5 h-5 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm text-gray-700 leading-relaxed">{aiResponse}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Attached Files Display */}
+              {attachedFiles.length > 0 && (
+                <div className="mb-4 flex flex-wrap gap-2">
+                  {attachedFiles.map((file, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center gap-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm transition-colors border border-gray-200"
+                    >
+                      <FileText className="w-4 h-4 text-gray-600" />
+                      <span className="text-gray-700 truncate max-w-[150px]">{file.name}</span>
+                      <button
+                        onClick={() => removeFile(index)}
+                        className="text-gray-500 hover:text-red-600 transition-colors"
+                        type="button"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Input Form */}
+              <form onSubmit={handleAISubmit} className="space-y-4">
+                <div className="relative">
+                  <textarea
+                    value={aiInput}
+                    onChange={(e) => setAiInput(e.target.value)}
+                    placeholder="Ask a question about renting, utilities, agreements, or property management..."
+                    className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none min-h-[100px] text-sm"
+                    disabled={isLoading}
+                    rows={3}
+                  />
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    onChange={handleFileAttach}
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="absolute right-3 top-3 p-2 text-gray-500 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                    disabled={isLoading}
+                    title="Attach file"
+                  >
+                    <Paperclip className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between gap-3">
+                  {/* Quick Actions */}
+                  <div className="flex flex-wrap gap-2 flex-1">
+                    {[
+                      'How do I track utilities?',
+                      'What is a move-in report?',
+                      'Explain rental agreement',
+                    ].map((question) => (
+                      <button
+                        key={question}
+                        type="button"
+                        onClick={() => setAiInput(question)}
+                        className="text-xs px-3 py-1.5 bg-gray-100 hover:bg-purple-100 text-gray-700 hover:text-purple-700 rounded-lg transition-colors border border-gray-200"
+                        disabled={isLoading}
+                      >
+                        {question}
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => onNavigate('ask-ai')}
+                      className="text-xs px-3 py-1.5 text-purple-600 hover:text-purple-700 hover:bg-purple-50 rounded-lg transition-colors font-medium border border-purple-200"
+                    >
+                      View Full Chat →
+                    </button>
+                  </div>
+
+                  {/* Submit Button */}
+                  <button
+                    type="submit"
+                    disabled={(!aiInput.trim() && attachedFiles.length === 0) || isLoading}
+                    className="px-6 py-3 bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-xl hover:from-purple-600 hover:to-purple-700 transition-all shadow-md hover:shadow-lg disabled:bg-gray-300 disabled:cursor-not-allowed disabled:shadow-none flex items-center gap-2 font-medium"
+                  >
+                    {isLoading ? (
+                      <>
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        <span className="hidden sm:inline">Sending...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-5 h-5" />
+                        <span className="hidden sm:inline">Send</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         </div>
@@ -110,7 +277,7 @@ export function Dashboard({ properties, user, onNavigate, onSignOut }: Dashboard
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Report Generator */}
             <div className="group bg-white rounded-2xl shadow-sm border border-gray-200 p-6 md:p-8 hover:shadow-xl hover:border-indigo-300 transition-all duration-300">
-              <div className="w-14 h-14 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+              <div className="w-14 h-14 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                 <FileText className="w-7 h-7 text-white" />
               </div>
               <h3 className="text-xl font-bold text-gray-900 mb-3">Report Generator</h3>
@@ -135,7 +302,7 @@ export function Dashboard({ properties, user, onNavigate, onSignOut }: Dashboard
 
             {/* Utilities Tracker */}
             <div className="group bg-white rounded-2xl shadow-sm border border-gray-200 p-6 md:p-8 hover:shadow-xl hover:border-green-300 transition-all duration-300">
-              <div className="w-14 h-14 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+              <div className="w-14 h-14 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                 <Zap className="w-7 h-7 text-white" />
               </div>
               <h3 className="text-xl font-bold text-gray-900 mb-3">Utilities Tracker</h3>
