@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { ArrowLeft, FileText, Download, Calendar, TrendingUp, DollarSign } from 'lucide-react';
+import { ArrowLeft, FileText, Download, Calendar, TrendingUp, DollarSign, Sparkles, X } from 'lucide-react';
 import type { Property, MoveInReportType, UtilityReading } from '../App';
+import { generateForm198 } from '../services/claudeAI';
 
 type ReportsProps = {
   properties: Property[];
@@ -20,6 +21,9 @@ export function Reports({ properties, reports, utilities, onBack, defaultMode = 
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
+  const [showForm198Modal, setShowForm198Modal] = useState(false);
+  const [generatingForm198, setGeneratingForm198] = useState(false);
+  const [form198Content, setForm198Content] = useState<string>('');
 
   const selectedProperty = properties.find(p => p.id === selectedPropertyId);
   const selectedReport = reports.find(r => r.propertyId === selectedPropertyId);
@@ -84,6 +88,51 @@ export function Reports({ properties, reports, utilities, onBack, defaultMode = 
       : 'Complete Report';
     
     alert(`${reportTypeName} for ${selectedProperty?.propertyAddress} would be generated here. In production, this would create a downloadable PDF.`);
+  };
+
+  // Generate Form 198 with AI
+  const handleGenerateForm198 = async () => {
+    if (!selectedPropertyId || !selectedProperty) {
+      alert('Please select a property first');
+      return;
+    }
+
+    setGeneratingForm198(true);
+    setShowForm198Modal(true);
+
+    try {
+      // Example dispute data - in production, this would come from a form
+      const form198 = await generateForm198({
+        plaintiffName: selectedProperty.renterName,
+        plaintiffIC: '123456-78-9012', // Would come from user profile
+        plaintiffAddress: 'Plaintiff Address',
+        defendantName: 'Property Owner',
+        defendantIC: '987654-32-1098',
+        defendantAddress: selectedProperty.propertyAddress,
+        amount: 2000,
+        reason: 'Deposit withholding dispute',
+        facts: [
+          `Tenancy agreement for ${selectedProperty.propertyAddress} dated ${new Date(selectedProperty.moveInDate).toLocaleDateString()}`,
+          'Move-in report documented pre-existing damage',
+          'Landlord withheld RM 2000 from security deposit',
+          'Tenant disputes liability for pre-existing damage'
+        ],
+        evidence: [
+          'Move-in report with photos',
+          'Tenancy agreement',
+          'Payment receipts',
+          'Communication records'
+        ]
+      });
+
+      setForm198Content(form198);
+    } catch (error) {
+      console.error('Form 198 generation error:', error);
+      alert('Failed to generate Form 198. Please ensure the backend server is running (npm run server)');
+      setShowForm198Modal(false);
+    } finally {
+      setGeneratingForm198(false);
+    }
   };
 
   const totals = calculateUtilityTotals();
@@ -251,6 +300,25 @@ export function Reports({ properties, reports, utilities, onBack, defaultMode = 
                   <Download className="w-5 h-5" />
                   {mode === 'monthly' ? 'Generate Monthly Report' : 'Generate Report'}
                 </button>
+
+                {/* AI Legal Documents Section */}
+                <div className="pt-6 border-t border-gray-200">
+                  <h3 className="text-gray-900 font-semibold mb-3 flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-purple-600" />
+                    AI Legal Documents
+                  </h3>
+                  <button
+                    onClick={handleGenerateForm198}
+                    disabled={!selectedPropertyId}
+                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed shadow-lg"
+                  >
+                    <Sparkles className="w-5 h-5" />
+                    Generate Form 198 (Borang 198)
+                  </button>
+                  <p className="text-xs text-gray-500 mt-2">
+                    AI-powered Form 198 for Tribunal Tuntutan Pengguna Malaysia
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -472,6 +540,90 @@ export function Reports({ properties, reports, utilities, onBack, defaultMode = 
           </div>
         </div>
       </main>
+
+      {/* Form 198 Modal */}
+      {showForm198Modal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            {/* Modal Header */}
+            <div className="p-6 border-b border-gray-200 flex items-center justify-between bg-gradient-to-r from-purple-600 to-pink-600">
+              <div className="flex items-center gap-3">
+                <Sparkles className="w-6 h-6 text-white" />
+                <div>
+                  <h2 className="text-xl font-bold text-white">Form 198 - Borang 198</h2>
+                  <p className="text-sm text-purple-100">Tribunal Tuntutan Pengguna Malaysia</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowForm198Modal(false)}
+                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+              >
+                <X className="w-6 h-6 text-white" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto p-6">
+              {generatingForm198 ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                  <p className="text-lg font-medium text-gray-900 mb-2">Generating Form 198...</p>
+                  <p className="text-sm text-gray-600">AI is preparing your legal document</p>
+                </div>
+              ) : form198Content ? (
+                <div>
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+                    <p className="text-sm text-yellow-800">
+                      <strong>⚠️ Legal Disclaimer:</strong> This AI-generated document is for reference only. 
+                      Please consult with a qualified lawyer before submitting to the tribunal.
+                    </p>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
+                    <pre className="whitespace-pre-wrap font-mono text-sm text-gray-900">
+                      {form198Content}
+                    </pre>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <p className="text-gray-600">No content generated</p>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            {!generatingForm198 && form198Content && (
+              <div className="p-6 border-t border-gray-200 flex gap-3">
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(form198Content);
+                    alert('Form 198 copied to clipboard!');
+                  }}
+                  className="flex-1 px-6 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
+                >
+                  Copy to Clipboard
+                </button>
+                <button
+                  onClick={() => {
+                    const blob = new Blob([form198Content], { type: 'text/plain' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `Form_198_${selectedProperty?.propertyAddress.replace(/\s+/g, '_')}.txt`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                  }}
+                  className="flex-1 px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 transition-colors font-medium"
+                >
+                  Download Form 198
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

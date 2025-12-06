@@ -1,7 +1,8 @@
 import { useState, useRef } from 'react';
-import { FileText, Zap, MessageSquare, PlusCircle, ChevronRight, LogOut, TrendingUp, CheckCircle2, Clock, ArrowRight, Send, Paperclip, X, Bot } from 'lucide-react';
+import { FileText, Zap, MessageSquare, PlusCircle, ChevronRight, LogOut, TrendingUp, CheckCircle2, Clock, ArrowRight, Send, Paperclip, X, Bot, Sparkles } from 'lucide-react';
 import type { Property } from '../App';
 import type { AuthUser } from './SignIn';
+import { chatWithUser } from '../services/claudeAI';
 
 type DashboardProps = {
   properties: Property[];
@@ -40,14 +41,18 @@ export function Dashboard({ properties, user, onNavigate, onSignOut }: Dashboard
     setIsLoading(true);
     setAiResponse(null);
 
-    // Simulate AI response
-    setTimeout(() => {
-      const response = `I've received your ${attachedFiles.length > 0 ? `message with ${attachedFiles.length} file(s) attached` : 'message'}. ${aiInput.trim() ? `Regarding "${aiInput}", ` : ''}I can help you with questions about rental processes, utilities tracking, lease agreements, and property management. How can I assist you further?`;
+    try {
+      // Call real Claude AI
+      const response = await chatWithUser([], aiInput.trim());
       setAiResponse(response);
-      setIsLoading(false);
       setAiInput('');
       setAttachedFiles([]);
-    }, 1500);
+    } catch (error) {
+      console.error('AI Chat Error:', error);
+      setAiResponse('Sorry, I encountered an error. Please make sure the backend server is running (npm run server) and try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

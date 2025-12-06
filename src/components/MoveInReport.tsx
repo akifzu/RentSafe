@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
-import { ArrowLeft, Plus, Trash2, Camera, X, Upload, Image } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Camera, X, Upload, Image, Sparkles, AlertCircle } from 'lucide-react';
 import type { Property, MoveInReportType } from '../App';
+import { analyzePropertyPhoto } from '../services/claudeAI';
 
 type MoveInReportProps = {
   propertyId: string;
@@ -14,6 +15,7 @@ type Room = {
   condition: string;
   photos: string[];
   notes: string;
+  aiAnalysis?: any;
 };
 
 export function MoveInReport({ propertyId, property, onSubmit, onBack }: MoveInReportProps) {
@@ -21,6 +23,7 @@ export function MoveInReport({ propertyId, property, onSubmit, onBack }: MoveInR
     { name: 'Living Room', condition: 'excellent', photos: [], notes: '' },
   ]);
   const [uploadingRoom, setUploadingRoom] = useState<number | null>(null);
+  const [analyzingRoom, setAnalyzingRoom] = useState<number | null>(null);
   const fileInputRefs = useRef<{ [key: number]: HTMLInputElement | null }>({});
 
   const addRoom = () => {
@@ -37,7 +40,7 @@ export function MoveInReport({ propertyId, property, onSubmit, onBack }: MoveInR
     setRooms(newRooms);
   };
 
-  // Handle photo upload
+  // Handle photo upload with AI analysis
   const handlePhotoUpload = async (roomIndex: number, files: FileList | null) => {
     if (!files || files.length === 0) return;
     
@@ -77,6 +80,42 @@ export function MoveInReport({ propertyId, property, onSubmit, onBack }: MoveInR
     // Clear the file input
     if (fileInputRefs.current[roomIndex]) {
       fileInputRefs.current[roomIndex]!.value = '';
+    }
+
+    // Run AI analysis on first photo
+    if (newPhotos.length > 0 && newRooms[roomIndex].name) {
+      await runAIAnalysis(roomIndex, newPhotos[0]);
+    }
+  };
+
+  // Run AI analysis on photo
+  const runAIAnalysis = async (roomIndex: number, photoBase64: string) => {
+    setAnalyzingRoom(roomIndex);
+    
+    try {
+      // Extract base64 data (remove data:image/jpeg;base64, prefix)
+      const base64Data = photoBase64.split(',')[1];
+      
+      const analysis = await analyzePropertyPhoto(base64Data, {
+        propertyAddress: property?.propertyAddress || 'Property',
+        roomType: rooms[roomIndex].name,
+        moveInDate: new Date().toISOString()
+      });
+
+      // Update room with AI analysis
+      const newRooms = [...rooms];
+      newRooms[roomIndex] = {
+        ...newRooms[roomIndex],
+        aiAnalysis: analysis
+      };
+      setRooms(newRooms);
+      
+      console.log('✅ AI Analysis Complete:', analysis);
+    } catch (error) {
+      console.error('❌ AI Analysis Failed:', error);
+      alert('AI analysis failed. Please check that the backend server is running (npm run server)');
+    } finally {
+      setAnalyzingRoom(null);
     }
   };
 
@@ -208,6 +247,76 @@ export function MoveInReport({ propertyId, property, onSubmit, onBack }: MoveInR
                         placeholder="Any scratches, stains, or issues to document..."
                       />
                     </div>
+
+                    {/* AI Analysis Results */}
+                    {analyzingRoom === index && (
+                      <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                        <div className="flex items-center gap-2 text-purple-700">
+                          <div className="w-5 h-5 border-2 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
+                          <Sparkles className="w-5 h-5" />
+                          <span className="font-medium">AI analyzing photo...</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {room.aiAnalysis && (
+                      <div className="p-4 bg-gradient-to-br from-purple-50 to-indigo-50 border border-purple-200 rounded-lg">
+                        <div className="flex items-center gap-2 text-purple-700 mb-3">
+                          <Sparkles className="w-5 h-5" />
+                          <span className="font-semibold">AI Analysis Results</span>
+                        </div>
+                        
+                        <div className="space-y-3">
+                          <div>
+                            <p className="text-sm font-medium text-gray-700 mb-1">Overall Assessment:</p>
+                            <p className="text-sm text-gray-600">{room.aiAnalysis.overall_assessment}</p>
+                          </div>
+
+                          {room.aiAnalysis.items_detected && room.aiAnalysis.items_detected.length > 0 && (
+                            <div>
+                              <p className="text-sm font-medium text-gray-700 mb-2">Items Detected:</p>
+                              <div className="space-y-2">
+                                {room.aiAnalysis.items_detected.map((item: any, idx: number) => (
+                                  <div key={idx} className="p-3 bg-white rounded-lg border border-gray-200">
+                                    <div className="flex items-start justify-between mb-1">
+                                      <span className="text-sm font-medium text-gray-900">
+                                        {item.object} - {item.issue}
+                                      </span>
+                                      <span className={`text-xs px-2 py-1 rounded-full ${
+                                        item.classification === 'pre_existing_damage' ? 'bg-yellow-100 text-yellow-800' :
+                                        item.classification === 'wear_and_tear' ? 'bg-green-100 text-green-800' :
+                                        item.classification === 'tenant_damage' ? 'bg-red-100 text-red-800' :
+                                        'bg-gray-100 text-gray-800'
+                                      }`}>
+                                        {item.classification.replace(/_/g, ' ')}
+                                      </span>
+                                    </div>
+                                    <p className="text-xs text-gray-600 mb-1">{item.reasoning}</p>
+                                    <div className="flex items-center gap-3 text-xs text-gray-500">
+                                      <span>Confidence: {(item.confidence * 100).toFixed(0)}%</span>
+                                      <span>•</span>
+                                      <span>Liability: {item.tenant_liability}</span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {room.aiAnalysis.recommendation && (
+                            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                              <div className="flex items-start gap-2">
+                                <AlertCircle className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                                <div>
+                                  <p className="text-xs font-medium text-blue-900 mb-1">Recommendation:</p>
+                                  <p className="text-xs text-blue-700">{room.aiAnalysis.recommendation}</p>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
 
                     <div>
                       <label className="block text-gray-700 mb-2">
