@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { ArrowLeft, Plus, Trash2, Camera } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { ArrowLeft, Plus, Trash2, Camera, X, Upload, Image } from 'lucide-react';
 import type { Property, MoveInReportType } from '../App';
 
 type MoveInReportProps = {
@@ -20,6 +20,8 @@ export function MoveInReport({ propertyId, property, onSubmit, onBack }: MoveInR
   const [rooms, setRooms] = useState<Room[]>([
     { name: 'Living Room', condition: 'excellent', photos: [], notes: '' },
   ]);
+  const [uploadingRoom, setUploadingRoom] = useState<number | null>(null);
+  const fileInputRefs = useRef<{ [key: number]: HTMLInputElement | null }>({});
 
   const addRoom = () => {
     setRooms([...rooms, { name: '', condition: 'good', photos: [], notes: '' }]);
@@ -33,6 +35,74 @@ export function MoveInReport({ propertyId, property, onSubmit, onBack }: MoveInR
     const newRooms = [...rooms];
     newRooms[index] = { ...newRooms[index], [field]: value };
     setRooms(newRooms);
+  };
+
+  // Handle photo upload
+  const handlePhotoUpload = async (roomIndex: number, files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    
+    setUploadingRoom(roomIndex);
+    
+    const newPhotos: string[] = [];
+    
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        alert(`${file.name} is not an image file`);
+        continue;
+      }
+      
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        alert(`${file.name} is too large. Maximum size is 5MB`);
+        continue;
+      }
+      
+      // Convert to base64
+      const base64 = await fileToBase64(file);
+      newPhotos.push(base64);
+    }
+    
+    // Update room photos
+    const newRooms = [...rooms];
+    newRooms[roomIndex] = {
+      ...newRooms[roomIndex],
+      photos: [...newRooms[roomIndex].photos, ...newPhotos],
+    };
+    setRooms(newRooms);
+    setUploadingRoom(null);
+    
+    // Clear the file input
+    if (fileInputRefs.current[roomIndex]) {
+      fileInputRefs.current[roomIndex]!.value = '';
+    }
+  };
+
+  // Convert file to base64
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
+  // Remove photo from room
+  const removePhoto = (roomIndex: number, photoIndex: number) => {
+    const newRooms = [...rooms];
+    newRooms[roomIndex] = {
+      ...newRooms[roomIndex],
+      photos: newRooms[roomIndex].photos.filter((_, i) => i !== photoIndex),
+    };
+    setRooms(newRooms);
+  };
+
+  // Trigger file input click
+  const triggerFileInput = (roomIndex: number) => {
+    fileInputRefs.current[roomIndex]?.click();
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -143,14 +213,81 @@ export function MoveInReport({ propertyId, property, onSubmit, onBack }: MoveInR
                       <label className="block text-gray-700 mb-2">
                         Photos
                       </label>
-                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-                        <Camera className="w-8 h-8 text-gray-500 mx-auto mb-2" />
-                        <p className="text-sm text-gray-600">
-                          In a production app, you would upload photos here
-                        </p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          Click to add photos of this room
-                        </p>
+                      
+                      {/* Hidden file input */}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        ref={(el) => (fileInputRefs.current[index] = el)}
+                        onChange={(e) => handlePhotoUpload(index, e.target.files)}
+                        className="hidden"
+                      />
+                      
+                      {/* Photo preview grid */}
+                      {room.photos.length > 0 && (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mb-4">
+                          {room.photos.map((photo, photoIndex) => (
+                            <div
+                              key={photoIndex}
+                              className="relative group aspect-square rounded-lg overflow-hidden border border-gray-200 shadow-sm"
+                            >
+                              <img
+                                src={photo}
+                                alt={`${room.name} photo ${photoIndex + 1}`}
+                                className="w-full h-full object-cover"
+                              />
+                              {/* Delete button overlay */}
+                              <button
+                                type="button"
+                                onClick={() => removePhoto(index, photoIndex)}
+                                className="absolute top-1 right-1 p-1.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 shadow-md"
+                                title="Remove photo"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                              {/* Photo number badge */}
+                              <div className="absolute bottom-1 left-1 px-2 py-0.5 bg-black/60 text-white text-xs rounded">
+                                {photoIndex + 1}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      
+                      {/* Upload area */}
+                      <div
+                        onClick={() => triggerFileInput(index)}
+                        className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
+                          uploadingRoom === index
+                            ? 'border-indigo-400 bg-indigo-50'
+                            : 'border-gray-300 hover:border-indigo-400 hover:bg-indigo-50'
+                        }`}
+                      >
+                        {uploadingRoom === index ? (
+                          <>
+                            <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                            <p className="text-sm text-indigo-600">Uploading photos...</p>
+                          </>
+                        ) : (
+                          <>
+                            <div className="flex justify-center gap-2 mb-2">
+                              <Camera className="w-6 h-6 text-gray-400" />
+                              <Upload className="w-6 h-6 text-gray-400" />
+                            </div>
+                            <p className="text-sm text-gray-600 font-medium">
+                              Click to upload photos
+                            </p>
+                            <p className="text-xs text-gray-500 mt-1">
+                              PNG, JPG, JPEG up to 5MB each
+                            </p>
+                            {room.photos.length > 0 && (
+                              <p className="text-xs text-indigo-600 mt-2 font-medium">
+                                {room.photos.length} photo{room.photos.length !== 1 ? 's' : ''} uploaded
+                              </p>
+                            )}
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>
