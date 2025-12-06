@@ -394,9 +394,10 @@ export function MyReports({ properties, reports, utilities, onBack }: MyReportsP
         )}
       </main>
 
-      {/* Move-In Report Detail Modal - Full Screen */}
+      {/* Move-In Report Detail Modal - Centered Full Screen */}
       {selectedReport && (
-        <div className="fixed inset-0 bg-white z-50 flex flex-col print:static print:block">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 print:static print:block print:bg-white print:p-0">
+          <div className="bg-white w-full max-w-5xl max-h-[95vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden print:max-w-none print:max-h-none print:rounded-none print:shadow-none">
           {/* Modal Header */}
           <div className="bg-gradient-to-r from-indigo-500 to-purple-600 px-4 sm:px-8 py-4 flex items-center justify-between flex-shrink-0 print:bg-white print:border-b print:border-gray-200">
             <div className="flex items-center gap-3">
@@ -567,13 +568,14 @@ export function MyReports({ properties, reports, utilities, onBack }: MyReportsP
               </div>
             </div>
           </div>
+          </div>
         </div>
       )}
 
       {/* Photo Lightbox */}
       {selectedPhoto && (
         <div
-          className="fixed inset-0 bg-black/90 z-[60] flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black/90 z-[110] flex items-center justify-center p-4"
           onClick={() => setSelectedPhoto(null)}
         >
           <button
