@@ -1,14 +1,15 @@
-import { Home, FileText, User, Settings } from 'lucide-react';
+import { Home, FileText, User, Settings, FolderOpen } from 'lucide-react';
 
 type NavigationProps = {
   currentView: string;
-  onNavigate: (view: 'dashboard' | 'properties' | 'profile' | 'settings') => void;
+  onNavigate: (view: 'dashboard' | 'properties' | 'my-reports' | 'profile' | 'settings') => void;
 };
 
 export function Navigation({ currentView, onNavigate }: NavigationProps) {
   const navItems = [
     { id: 'dashboard', icon: Home, label: 'Home' },
     { id: 'properties', icon: FileText, label: 'Properties' },
+    { id: 'my-reports', icon: FolderOpen, label: 'My Reports' },
     { id: 'profile', icon: User, label: 'Profile' },
     { id: 'settings', icon: Settings, label: 'Settings' },
   ];
@@ -37,7 +38,7 @@ export function Navigation({ currentView, onNavigate }: NavigationProps) {
               return (
                 <button
                   key={item.id}
-                  onClick={() => onNavigate(item.id as 'dashboard' | 'properties' | 'profile' | 'settings')}
+                  onClick={() => onNavigate(item.id as 'dashboard' | 'properties' | 'my-reports' | 'profile' | 'settings')}
                   className={`group relative flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2 px-4 py-2 rounded-lg transition-all ${
                     isActive
                       ? 'text-indigo-600 bg-indigo-50'

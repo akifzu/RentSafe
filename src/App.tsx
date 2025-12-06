@@ -10,6 +10,7 @@ import { MoveInReport } from './components/MoveInReport';
 import { UtilitiesTracker } from './components/UtilitiesTracker';
 import { Reports } from './components/Reports';
 import { AskAI } from './components/AskAI';
+import { MyReports } from './components/MyReports';
 
 export type Property = {
   id: string;
@@ -45,7 +46,7 @@ export type UtilityReading = {
   rentReceipt?: string;
 };
 
-type ViewType = 'dashboard' | 'properties' | 'profile' | 'settings' | 'create-property' | 'move-in-report' | 'utilities' | 'reports' | 'ask-ai';
+type ViewType = 'dashboard' | 'properties' | 'profile' | 'settings' | 'create-property' | 'move-in-report' | 'utilities' | 'reports' | 'ask-ai' | 'my-reports';
 
 export default function App() {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -187,6 +188,15 @@ export default function App() {
       
       {currentView === 'ask-ai' && (
         <AskAI 
+          onBack={() => setCurrentView('dashboard')}
+        />
+      )}
+      
+      {currentView === 'my-reports' && (
+        <MyReports 
+          properties={properties}
+          reports={reports}
+          utilities={utilities}
           onBack={() => setCurrentView('dashboard')}
         />
       )}
