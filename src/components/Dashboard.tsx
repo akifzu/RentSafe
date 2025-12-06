@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { FileText, Zap, MessageSquare, PlusCircle, ChevronRight, LogOut, TrendingUp, CheckCircle2, Clock, ArrowRight, Send, Paperclip, X, Bot } from 'lucide-react';
 import type { Property } from '../App';
 import type { AuthUser } from './SignIn';
+import { callAIService } from '../services/api';
 
 type DashboardProps = {
   properties: Property[];
@@ -40,14 +41,29 @@ export function Dashboard({ properties, user, onNavigate, onSignOut }: Dashboard
     setIsLoading(true);
     setAiResponse(null);
 
-    // Simulate AI response
-    setTimeout(() => {
-      const response = `I've received your ${attachedFiles.length > 0 ? `message with ${attachedFiles.length} file(s) attached` : 'message'}. ${aiInput.trim() ? `Regarding "${aiInput}", ` : ''}I can help you with questions about rental processes, utilities tracking, lease agreements, and property management. How can I assist you further?`;
-      setAiResponse(response);
+    try {
+      // Make API call to AI service
+      const result = await callAIService({
+        message: aiInput.trim(),
+        files: attachedFiles.length > 0 ? attachedFiles : undefined,
+        context: 'rental-property-management',
+      });
+
+      if (result.error) {
+        // Fallback to simulated response if API fails
+        setAiResponse(`I've received your ${attachedFiles.length > 0 ? `message with ${attachedFiles.length} file(s) attached` : 'message'}. ${aiInput.trim() ? `Regarding "${aiInput}", ` : ''}I can help you with questions about rental processes, utilities tracking, lease agreements, and property management. How can I assist you further?\n\n(Note: API connection unavailable - using fallback response)`);
+      } else {
+        setAiResponse(result.response);
+      }
+    } catch (error) {
+      console.error('Error calling AI service:', error);
+      // Fallback response on error
+      setAiResponse(`I've received your ${attachedFiles.length > 0 ? `message with ${attachedFiles.length} file(s) attached` : 'message'}. ${aiInput.trim() ? `Regarding "${aiInput}", ` : ''}I can help you with questions about rental processes, utilities tracking, lease agreements, and property management. How can I assist you further?\n\n(Note: API connection error - using fallback response)`);
+    } finally {
       setIsLoading(false);
       setAiInput('');
       setAttachedFiles([]);
-    }, 1500);
+    }
   };
 
   return (
