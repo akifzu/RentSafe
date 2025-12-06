@@ -394,10 +394,9 @@ export function MyReports({ properties, reports, utilities, onBack }: MyReportsP
         )}
       </main>
 
-      {/* Move-In Report Detail Modal - Centered Full Screen */}
+      {/* Move-In Report Detail Modal - Full Screen */}
       {selectedReport && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 print:static print:block print:bg-white print:p-0">
-          <div className="bg-white w-full max-w-5xl max-h-[95vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden print:max-w-none print:max-h-none print:rounded-none print:shadow-none">
+        <div className="fixed inset-0 z-[100] bg-white flex flex-col print:static print:block">
           {/* Modal Header */}
           <div className="bg-gradient-to-r from-indigo-500 to-purple-600 px-4 sm:px-8 py-4 flex items-center justify-between flex-shrink-0 print:bg-white print:border-b print:border-gray-200">
             <div className="flex items-center gap-3">
@@ -567,7 +566,6 @@ export function MyReports({ properties, reports, utilities, onBack }: MyReportsP
                 <p className="mt-1">Report ID: {selectedReport.propertyId}-{new Date(selectedReport.submittedAt).getTime()}</p>
               </div>
             </div>
-          </div>
           </div>
         </div>
       )}
