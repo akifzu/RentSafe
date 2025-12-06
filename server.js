@@ -84,3 +84,7 @@ app.listen(PORT, () => {
   `);
 });
 
+origin: [
+    'http://localhost:5173',
+    'https://your-app.vercel.app' // Add this
+  ]
