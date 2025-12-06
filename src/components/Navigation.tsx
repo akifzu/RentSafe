@@ -9,7 +9,7 @@ export function Navigation({ currentView, onNavigate }: NavigationProps) {
   const navItems = [
     { id: 'dashboard', icon: Home, label: 'Home' },
     { id: 'properties', icon: FileText, label: 'Properties' },
-    { id: 'my-reports', icon: FolderOpen, label: 'My Reports' },
+    { id: 'my-reports', icon: FolderOpen, label: 'Reports' },
     { id: 'profile', icon: User, label: 'Profile' },
     { id: 'settings', icon: Settings, label: 'Settings' },
   ];
