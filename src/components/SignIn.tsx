@@ -1,9 +1,11 @@
 import { useState } from 'react';
-import { Home, User, Building2 } from 'lucide-react';
+import { Home, User, Building2, Loader2 } from 'lucide-react';
+import { auth } from '../services/database';
 
 export type UserType = 'owner' | 'tenant';
 
 export type AuthUser = {
+  id: string;
   name: string;
   email: string;
   type: UserType;
@@ -14,23 +16,60 @@ type SignInProps = {
 };
 
 export function SignIn({ onSignIn }: SignInProps) {
+  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [userType, setUserType] = useState<UserType>('tenant');
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
   });
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
+    setIsLoading(true);
     
-    const user: AuthUser = {
-      name: formData.name,
-      email: formData.email,
-      type: userType,
-    };
-    
-    onSignIn(user);
+    try {
+      if (mode === 'signup') {
+        // Sign up with Supabase
+        const { user } = await auth.signUp(
+          formData.email,
+          formData.password,
+          formData.name,
+          userType
+        );
+        
+        if (user) {
+          const authUser: AuthUser = {
+            id: user.id,
+            name: formData.name,
+            email: formData.email,
+            type: userType,
+          };
+          onSignIn(authUser);
+        }
+      } else {
+        // Sign in with Supabase
+        const { user } = await auth.signIn(formData.email, formData.password);
+        
+        if (user) {
+          const authUser: AuthUser = {
+            id: user.id,
+            name: user.user_metadata?.name || formData.email.split('@')[0],
+            email: user.email || formData.email,
+            type: (user.user_metadata?.user_type as UserType) || 'tenant',
+          };
+          onSignIn(authUser);
+        }
+      }
+    } catch (err: any) {
+      console.error('Auth error:', err);
+      setError(err.message || 'Authentication failed. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -45,9 +84,44 @@ export function SignIn({ onSignIn }: SignInProps) {
           <p className="text-gray-600">Secure Renting Process Platform</p>
         </div>
 
-        {/* Sign In Form */}
+        {/* Sign In/Sign Up Form */}
         <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-8">
-          <h2 className="text-gray-900 mb-6 text-center">Sign In to Your Account</h2>
+          {/* Mode Tabs */}
+          <div className="flex gap-2 mb-6 bg-gray-100 p-1 rounded-lg">
+            <button
+              type="button"
+              onClick={() => setMode('signin')}
+              className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${
+                mode === 'signin'
+                  ? 'bg-white text-indigo-600 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Sign In
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode('signup')}
+              className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${
+                mode === 'signup'
+                  ? 'bg-white text-indigo-600 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Sign Up
+            </button>
+          </div>
+
+          <h2 className="text-gray-900 mb-6 text-center">
+            {mode === 'signin' ? 'Sign In to Your Account' : 'Create Your Account'}
+          </h2>
+
+          {/* Error Message */}
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-red-700">{error}</p>
+            </div>
+          )}
 
           {/* User Type Selection */}
           <div className="grid grid-cols-2 gap-3 mb-6">
@@ -83,20 +157,22 @@ export function SignIn({ onSignIn }: SignInProps) {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label htmlFor="name" className="block text-gray-700 mb-2">
-                Full Name
-              </label>
-              <input
-                type="text"
-                id="name"
-                required
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                placeholder="John Doe"
-              />
-            </div>
+            {mode === 'signup' && (
+              <div>
+                <label htmlFor="name" className="block text-gray-700 mb-2">
+                  Full Name
+                </label>
+                <input
+                  type="text"
+                  id="name"
+                  required
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  placeholder="John Doe"
+                />
+              </div>
+            )}
 
             <div>
               <label htmlFor="email" className="block text-gray-700 mb-2">
@@ -130,14 +206,24 @@ export function SignIn({ onSignIn }: SignInProps) {
 
             <button
               type="submit"
-              className="w-full px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors mt-6"
+              disabled={isLoading}
+              className="w-full px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors mt-6 disabled:bg-indigo-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              Sign In as {userType === 'tenant' ? 'Tenant' : 'Owner'}
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  {mode === 'signin' ? 'Signing in...' : 'Creating account...'}
+                </>
+              ) : (
+                <>
+                  {mode === 'signin' ? 'Sign In' : 'Sign Up'} as {userType === 'tenant' ? 'Tenant' : 'Owner'}
+                </>
+              )}
             </button>
           </form>
 
           <p className="text-xs text-gray-500 text-center mt-6">
-            Demo mode - No real authentication required
+            {mode === 'signin' ? "Don't have an account? Click Sign Up above" : 'Already have an account? Click Sign In above'}
           </p>
         </div>
       </div>
