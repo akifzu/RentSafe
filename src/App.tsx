@@ -11,6 +11,7 @@ import { UtilitiesTracker } from './components/UtilitiesTracker';
 import { Reports } from './components/Reports';
 import { AskAI } from './components/AskAI';
 import { MyReports } from './components/MyReports';
+import { ReportView } from './components/ReportView';
 
 export type Property = {
   id: string;
@@ -46,7 +47,7 @@ export type UtilityReading = {
   rentReceipt?: string;
 };
 
-type ViewType = 'dashboard' | 'properties' | 'profile' | 'settings' | 'create-property' | 'move-in-report' | 'utilities' | 'reports' | 'ask-ai' | 'my-reports';
+type ViewType = 'dashboard' | 'properties' | 'profile' | 'settings' | 'create-property' | 'move-in-report' | 'utilities' | 'reports' | 'ask-ai' | 'my-reports' | 'report-view';
 
 export default function App() {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -56,6 +57,7 @@ export default function App() {
   const [utilities, setUtilities] = useState<UtilityReading[]>([]);
   const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
   const [previousView, setPreviousView] = useState<ViewType>('dashboard');
+  const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
 
   const handleCreateProperty = (property: Property) => {
     setProperties([...properties, property]);
@@ -105,6 +107,12 @@ export default function App() {
     setPreviousView(currentView);
     setCurrentView(view);
     setSelectedPropertyId(null);
+  };
+
+  const handleViewReport = (reportId: string) => {
+    setSelectedReportId(reportId);
+    setPreviousView(currentView);
+    setCurrentView('report-view');
   };
 
   if (!user) {
@@ -198,6 +206,15 @@ export default function App() {
           reports={reports}
           utilities={utilities}
           onBack={() => setCurrentView('dashboard')}
+          onViewReport={handleViewReport}
+        />
+      )}
+      
+      {currentView === 'report-view' && selectedReportId && (
+        <ReportView 
+          report={reports.find(r => r.propertyId === selectedReportId)!}
+          property={properties.find(p => p.id === selectedReportId)!}
+          onBack={() => setCurrentView('my-reports')}
         />
       )}
     </div>
